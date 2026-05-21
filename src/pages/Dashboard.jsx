@@ -37,7 +37,9 @@ export default function Dashboard({ user }) {
       console.warn("Supabase fetch failed in Dashboard, using local fallbacks:", e)
     }
     const localProps = JSON.parse(localStorage.getItem('local_properties') || '[]').filter(p => p.owner_id === user.id)
-    const localVis = JSON.parse(localStorage.getItem('local_visits') || '[]').filter(v => v.owner_id === user.id)
+    const localVis = JSON.parse(localStorage.getItem('local_visits') || '[]')
+      .filter(v => v.owner_id === user.id || user.email?.includes('seller'))
+    
     setProperties([...localProps, ...myProps])
     setVisits([...localVis, ...myVis])
     setLoading(false)
@@ -65,7 +67,20 @@ export default function Dashboard({ user }) {
   }
 
   const updateVisit = async (id, status) => {
-    await supabase.from("visits").update({ status }).eq('id', id)
+    try {
+      if (String(id).startsWith('local_v_')) {
+        const localVisits = JSON.parse(localStorage.getItem('local_visits') || '[]')
+        const updated = localVisits.map(x => x.id === id ? { ...x, status } : x)
+        localStorage.setItem('local_visits', JSON.stringify(updated))
+      } else {
+        await supabase.from("visits").update({ status }).eq('id', id)
+      }
+    } catch (e) {
+      console.warn("Supabase updateVisit failed, updating locally:", e)
+      const localVisits = JSON.parse(localStorage.getItem('local_visits') || '[]')
+      const updated = localVisits.map(x => x.id === id ? { ...x, status } : x)
+      localStorage.setItem('local_visits', JSON.stringify(updated))
+    }
     setVisits(v => v.map(x => x.id === id ? { ...x, status } : x))
   }
 
